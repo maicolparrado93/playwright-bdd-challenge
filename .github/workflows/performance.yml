@@ -1,0 +1,60 @@
+name: Performance Tests (K6)
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # Every Monday at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Which K6 test to run'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, load, stress, spike]
+
+jobs:
+  k6-performance:
+    name: K6 Performance Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install K6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Create results directory
+        run: mkdir -p k6-results
+
+      - name: Run Load Test — Product Catalog
+        if: inputs.test_type == 'all' || inputs.test_type == 'load'
+        run: k6 run k6/load-test-products.js --out json=k6-results/load-test-raw.json
+        continue-on-error: true
+
+      - name: Run Stress Test — User Registration
+        if: inputs.test_type == 'all' || inputs.test_type == 'stress'
+        env:
+          GOREST_TOKEN: ${{ secrets.GOREST_TOKEN }}
+        run: k6 run --env GOREST_TOKEN=$GOREST_TOKEN k6/stress-test-users.js --out json=k6-results/stress-test-raw.json
+        continue-on-error: true
+
+      - name: Run Spike Test — Flash Sale Simulation
+        if: inputs.test_type == 'all' || inputs.test_type == 'spike'
+        run: k6 run k6/spike-test.js --out json=k6-results/spike-test-raw.json
+        continue-on-error: true
+
+      - name: Upload K6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ github.run_number }}
+          path: k6-results/
+          retention-days: 90

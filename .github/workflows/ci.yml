@@ -1,0 +1,142 @@
+name: API Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * *'   # Nightly at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Cucumber profile to run'
+        required: false
+        default: 'smoke'
+        type: choice
+        options: [smoke, regression, default, fakestore, gorest]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Smoke: fast feedback on every PR ─────────────────────────────────────────
+  smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        env:
+          GOREST_TOKEN: ${{ secrets.GOREST_TOKEN }}
+          TEST_ENV: ${{ github.ref_name }}
+        run: npm run test:smoke
+
+      - name: Generate HTML report
+        if: always()
+        run: node generate-report.js reports/smoke-report.json reports/smoke-report.html
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report-${{ github.run_id }}
+          path: reports/
+          retention-days: 30
+
+  # ── Regression: full suite on merge to main/develop ──────────────────────────
+  regression:
+    name: Full Regression
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run regression suite
+        env:
+          GOREST_TOKEN: ${{ secrets.GOREST_TOKEN }}
+          TEST_ENV: ${{ github.ref_name }}
+        run: npm run test:regression
+
+      - name: Generate HTML report
+        if: always()
+        run: node generate-report.js reports/regression-report.json reports/regression-report.html
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-report-${{ github.run_id }}-${{ github.sha }}
+          path: reports/
+          retention-days: 90
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "::error::Regression suite failed on ${{ github.ref_name }} — check the uploaded report artifact"
+
+  # ── Nightly: full regression on schedule ─────────────────────────────────────
+  nightly:
+    name: Nightly Regression
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full suite (retry once on external API flakiness)
+        env:
+          GOREST_TOKEN: ${{ secrets.GOREST_TOKEN }}
+          TEST_ENV: nightly
+        # Single retry differentiates transient API issues from real bugs
+        run: |
+          npm run test:regression || (echo "First attempt failed — retrying in 30 s..." && sleep 30 && npm run test:regression)
+
+      - name: Generate HTML report
+        if: always()
+        run: node generate-report.js reports/regression-report.json reports/regression-report.html
+
+      - name: Upload nightly report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 90

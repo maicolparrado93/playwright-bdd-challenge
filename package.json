@@ -1,0 +1,28 @@
+{
+  "name": "qa-automation-test",
+  "version": "1.0.0",
+  "description": "QA Automation Engineer Technical Test — FakeStoreAPI & GoRest",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "cucumber-js --profile default",
+    "test:smoke": "cucumber-js --profile smoke",
+    "test:regression": "cucumber-js --profile regression",
+    "test:fakestore": "cucumber-js --profile fakestore",
+    "test:gorest": "cucumber-js --profile gorest",
+    "report": "node generate-report.js",
+    "test:all": "npm test && npm run report",
+    "test:smoke:report": "npm run test:smoke && node generate-report.js reports/smoke-report.json reports/smoke-report.html",
+    "test:regression:report": "npm run test:regression && node generate-report.js reports/regression-report.json reports/regression-report.html"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^10.3.1",
+    "@playwright/test": "^1.41.2",
+    "@types/node": "^20.11.5",
+    "cucumber-html-reporter": "^7.1.0",
+    "dotenv": "^16.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
