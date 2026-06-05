@@ -8,7 +8,7 @@ API test automation framework for [FakeStoreAPI](https://fakestoreapi.com/) and 
 
 | Tool | Purpose |
 |------|---------|
-| Node.js 20 | Runtime |
+| Node.js 22 | Runtime |
 | TypeScript 5 | Type safety across the codebase |
 | Playwright | HTTP client via `APIRequestContext` |
 | Cucumber 10 + Gherkin | BDD test definitions |
@@ -23,7 +23,7 @@ API test automation framework for [FakeStoreAPI](https://fakestoreapi.com/) and 
 ```bash
 # 1. Clone and install
 git clone https://github.com/maicolparrado93/playwright-bdd-challenge
-cd qa-automation-test
+cd playwright-bdd-challenge
 npm install
 
 # 2. Configure environment
