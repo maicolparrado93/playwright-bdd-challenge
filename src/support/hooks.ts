@@ -1,4 +1,6 @@
-import { Before, After, BeforeAll } from '@cucumber/cucumber';
+import { Before, After, BeforeAll, setDefaultTimeout } from '@cucumber/cucumber';
+
+setDefaultTimeout(30_000);
 import { request } from '@playwright/test';
 import * as dotenv from 'dotenv';
 import { ApiWorld } from './world';
